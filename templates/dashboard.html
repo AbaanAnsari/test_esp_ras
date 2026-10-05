@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Smart Hearing Aid - 4 MIC DOA Dashboard</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #111827;
+    color: #f3f4f6;
+}
+
+header {
+    padding: 18px 24px;
+    background: #1f2937;
+    border-bottom: 1px solid #374151;
+}
+
+h1 {
+    margin: 0;
+    font-size: 22px;
+}
+
+.subtitle {
+    margin-top: 5px;
+    color: #9ca3af;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    padding: 16px;
+}
+
+.card {
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 12px;
+    padding: 18px;
+}
+
+.full {
+    grid-column: 1 / -1;
+}
+
+.metric {
+    font-size: 36px;
+    font-weight: bold;
+}
+
+.label {
+    color: #9ca3af;
+    margin-bottom: 8px;
+}
+
+button {
+    border: 0;
+    border-radius: 8px;
+    padding: 12px 18px;
+    margin-right: 8px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+button:hover {
+    opacity: .85;
+}
+
+.record {
+    background: #dc2626;
+    color: white;
+}
+
+.stop {
+    background: #4b5563;
+    color: white;
+}
+
+.play {
+    background: #059669;
+    color: white;
+}
+
+canvas {
+    width: 100%;
+    height: 230px;
+    background: #111827;
+    border-radius: 8px;
+}
+
+#array {
+    position: relative;
+    width: 420px;
+    height: 420px;
+    margin: auto;
+    max-width: 90vw;
+}
+
+.circle {
+    position: absolute;
+    border: 2px solid #6b7280;
+    border-radius: 50%;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.outer {
+    width: 310px;
+    height: 310px;
+}
+
+.inner {
+    width: 8px;
+    height: 8px;
+    background: #f9fafb;
+    border: 0;
+}
+
+.mic {
+    position: absolute;
+    width: 62px;
+    height: 62px;
+    margin-left: -31px;
+    margin-top: -31px;
+    border-radius: 50%;
+    background: #2563eb;
+    border: 3px solid #93c5fd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.arrow {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 145px;
+    height: 4px;
+    background: #f59e0b;
+    transform-origin: 0 50%;
+    border-radius: 4px;
+}
+
+.arrow::after {
+    content: "";
+    position: absolute;
+    right: -3px;
+    top: -7px;
+    border-left: 16px solid #f59e0b;
+    border-top: 9px solid transparent;
+    border-bottom: 9px solid transparent;
+}
+
+.status {
+    padding: 8px 12px;
+    border-radius: 7px;
+    background: #374151;
+    display: inline-block;
+}
+
+.small {
+    color: #9ca3af;
+    font-size: 13px;
+}
+
+@media(max-width: 900px) {
+    .grid {
+        grid-template-columns: 1fr;
+    }
+
+    .full {
+        grid-column: auto;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>Smart Hearing Aid — 4-Microphone Beamforming</h1>
+    <div class="subtitle">
+        Raspberry Pi 5 DSP • ESP32-S3 wireless PCM • 5 cm radius circular array
+    </div>
+</header>
+
+<div class="grid">
+
+    <div class="card">
+        <div class="label">Direction of Arrival</div>
+        <div class="metric">
+            <span id="doa">--</span>°
+        </div>
+        <div class="small">
+            0° = MIC0 • 90° = MIC1 • 180° = MIC2 • 270° = MIC3
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="label">System status</div>
+        <div class="status" id="status">
+            Waiting for ESP32-S3
+        </div>
+        <p>
+            Packets: <b id="packets">0</b><br>
+            Lost packets: <b id="loss">0</b><br>
+            GCC score: <b id="gcc">0</b><br>
+            DOA confidence: <b id="confidence">0</b><br>
+            Beam RMS: <b id="rms">0</b>
+        </p>
+    </div>
+
+    <div class="card">
+        <h2>Physical 4-MIC Array</h2>
+
+        <div id="array">
+
+            <div class="circle outer"></div>
+            <div class="circle inner"></div>
+
+            <div id="mic0" class="mic">MIC0<br>0°</div>
+            <div id="mic1" class="mic">MIC1<br>90°</div>
+            <div id="mic2" class="mic">MIC2<br>180°</div>
+            <div id="mic3" class="mic">MIC3<br>270°</div>
+
+            <div id="arrow" class="arrow"></div>
+        </div>
+
+        <div class="small" style="text-align:center">
+            Radius = 5 cm • Diameter = 10 cm
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Controls</h2>
+
+        <button class="record" onclick="recordStart()">
+            ● RECORD
+        </button>
+
+        <button class="stop" onclick="recordStop()">
+            ■ STOP RECORDING
+        </button>
+
+        <button class="play" onclick="playStart()">
+            ▶ PLAY
+        </button>
+
+        <button class="stop" onclick="playStop()">
+            ■ STOP PLAYBACK
+        </button>
+
+        <p id="controlStatus" class="small">
+            Ready
+        </p>
+    </div>
+
+    <div class="card full">
+        <h2>Beamformed Audio</h2>
+        <canvas id="wave"></canvas>
+    </div>
+
+</div>
+
+<script>
+
+const waveCanvas = document.getElementById("wave");
+const ctx = waveCanvas.getContext("2d");
+
+function resizeCanvas() {
+    waveCanvas.width = waveCanvas.clientWidth;
+    waveCanvas.height = 230;
+}
+
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+function drawWave(samples) {
+
+    ctx.clearRect(
+        0, 0,
+        waveCanvas.width,
+        waveCanvas.height
+    );
+
+    if (!samples.length) return;
+
+    ctx.beginPath();
+
+    const mid = waveCanvas.height / 2;
+
+    for (let i = 0; i < samples.length; i++) {
+
+        const x =
+            i / (samples.length - 1) *
+            waveCanvas.width;
+
+        const y =
+            mid -
+            samples[i] *
+            90;
+
+        if (i === 0)
+            ctx.moveTo(x, y);
+        else
+            ctx.lineTo(x, y);
+    }
+
+    ctx.stroke();
+}
+
+function positionMics() {
+
+    const center = 210;
+    const radius = 155;
+
+    const angles = [
+        0, 90, 180, 270
+    ];
+
+    angles.forEach((angle, i) => {
+
+        const rad =
+            angle * Math.PI / 180;
+
+        const x =
+            center +
+            radius * Math.cos(rad);
+
+        const y =
+            center -
+            radius * Math.sin(rad);
+
+        const el =
+            document.getElementById("mic" + i);
+
+        el.style.left = x + "px";
+        el.style.top = y + "px";
+    });
+}
+
+positionMics();
+
+function updateArrow(deg) {
+
+    const arrow =
+        document.getElementById("arrow");
+
+    /*
+     * CSS zero degrees points to +X.
+     * Convert mathematical angle into CSS rotation.
+     */
+    arrow.style.transform =
+        "rotate(" + (-deg) + "deg)";
+}
+
+async function updateState() {
+
+    try {
+
+        const response =
+            await fetch("/api/state");
+
+        const s =
+            await response.json();
+
+        document.getElementById("doa")
+            .textContent = s.doa_deg.toFixed(1);
+
+        document.getElementById("packets")
+            .textContent = s.packets;
+
+        document.getElementById("loss")
+            .textContent = s.packet_loss;
+
+        document.getElementById("gcc")
+            .textContent = s.gcc_score;
+
+        document.getElementById("confidence")
+            .textContent = s.doa_confidence;
+
+        document.getElementById("rms")
+            .textContent = s.beam_rms;
+
+        document.getElementById("status")
+            .textContent = s.status;
+
+        updateArrow(s.doa_deg);
+
+        if (s.recording) {
+            document.getElementById("controlStatus")
+                .textContent = "Recording beamformed audio...";
+        }
+
+        if (s.playing) {
+            document.getElementById("controlStatus")
+                .textContent = "Playing beamformed recording...";
+        }
+
+    } catch(e) {
+        console.log(e);
+    }
+}
+
+async function updateWaveform() {
+
+    try {
+
+        const response =
+            await fetch("/api/waveform");
+
+        const data =
+            await response.json();
+
+        drawWave(data.samples);
+
+    } catch(e) {}
+}
+
+async function recordStart() {
+
+    await fetch(
+        "/api/record/start",
+        {method:"POST"}
+    );
+
+    document.getElementById("controlStatus")
+        .textContent =
+        "Recording started";
+}
+
+async function recordStop() {
+
+    await fetch(
+        "/api/record/stop",
+        {method:"POST"}
+    );
+
+    document.getElementById("controlStatus")
+        .textContent =
+        "Recording saved";
+}
+
+async function playStart() {
+
+    await fetch(
+        "/api/play/start",
+        {method:"POST"}
+    );
+
+    document.getElementById("controlStatus")
+        .textContent =
+        "Playback started";
+}
+
+async function playStop() {
+
+    await fetch(
+        "/api/play/stop",
+        {method:"POST"}
+    );
+
+    document.getElementById("controlStatus")
+        .textContent =
+        "Playback stopped";
+}
+
+setInterval(updateState, 200);
+setInterval(updateWaveform, 150);
+
+updateState();
+updateWaveform();
+
+</script>
+
+</body>
+</html>

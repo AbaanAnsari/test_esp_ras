@@ -1,0 +1,33 @@
+{
+  "udp_host": "0.0.0.0",
+  "udp_port": 5000,
+  "web_host": "0.0.0.0",
+  "web_port": 8080,
+
+  "sample_rate": 16000,
+  "channels": 4,
+  "packet_frames": 320,
+
+  "array_radius_m": 0.05,
+
+  "mic_angles_deg": [0, 90, 180, 270],
+
+  "speed_of_sound_mps": 343.0,
+
+  "fft_size": 512,
+  "hop_size": 256,
+
+  "bandpass_low_hz": 150.0,
+  "bandpass_high_hz": 7000.0,
+
+  "gcc_max_lag_ms": 0.50,
+
+  "doa_grid_step_deg": 2.0,
+
+  "record_file": "recordings/beamformed.wav",
+
+  "channel_gain": [1.0, 1.0, 1.0, 1.0],
+  "channel_delay_samples": [0.0, 0.0, 0.0, 0.0],
+
+  "playback_device": null
+}
